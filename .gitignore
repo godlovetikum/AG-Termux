@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.ag/
+.keys
+*.tmp
+.dev-android-ide/
+*.zip

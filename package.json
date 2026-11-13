@@ -1,0 +1,17 @@
+{
+  "name": "ag-termux",
+  "version": "1.0.0",
+  "description": "Free-tier coding agent for your phone: a fallback router over free LLM APIs plus a reviewed-edit CLI. Zero dependencies, built for Termux.",
+  "license": "MIT",
+  "private": false,
+  "bin": { "ag": "src/ag.js" },
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "install:local": "node install.js",
+    "test:e2e": "python3 test/e2e_chat.py",
+    "doctor": "node src/ag.js doctor"
+  },
+  "files": ["src", "install.js", "scripts", "docs"],
+  "keywords": ["termux", "android", "coding-agent", "llm", "groq", "gemini", "router"]
+}
