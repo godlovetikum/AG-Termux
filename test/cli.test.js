@@ -4,13 +4,14 @@ const assert = require('node:assert');
 const fs = require('fs'), os = require('os'), path = require('path');
 const { spawnSync } = require('child_process');
 const { mockProvider, setup, cli, cliAsync, SRC } = require('./helpers');
+const VERSION = require('../package.json').version;
 
 const LANES = { edit: [['a', 'model-a']], plan: [['a', 'model-a']] };
 
 test('version, help and unknown commands', async () => {
   const s = await setup({ a: { url: 'http://127.0.0.1:1', keyEnv: 'A_KEY' } }, LANES);
-  assert.match(cli(['version'], s.env).stdout, /^ag 1\.0\.0/);
-  assert.match(cli(['--version'], s.env).stdout, /^ag 1\.0\.0/);
+  assert.match(cli(['version'], s.env).stdout, new RegExp('^agt ' + VERSION.replace(/\./g, '\\.')));
+  assert.match(cli(['--version'], s.env).stdout, new RegExp('^agt ' + VERSION.replace(/\./g, '\\.')));
   const h = cli(['help'], s.env);
   assert.strictEqual(h.status, 0);
   for (const w of ['chat', 'doctor', 'router', 'undo', 'config']) assert.match(h.stdout, new RegExp(w));
@@ -21,8 +22,8 @@ test('version, help and unknown commands', async () => {
 });
 
 test('first run creates the data folder and a default config', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-first-'));
-  const env = { ...process.env, AG_HOME: path.join(home, 'data'), NO_COLOR: '1' };
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agt-first-'));
+  const env = { ...process.env, AGT_HOME: path.join(home, 'data'), NO_COLOR: '1', AGT_NO_UPDATE_CHECK: '1' };
   const r = cli(['config', 'path'], env);
   assert.strictEqual(r.status, 0);
   const cfg = JSON.parse(fs.readFileSync(path.join(home, 'data', 'config.json'), 'utf8'));
@@ -73,7 +74,7 @@ test('doctor reports a broken config instead of crashing', async () => {
   assert.match(r.stdout, /not valid JSON/);
   const other = cli(['stats'], s.env);
   assert.strictEqual(other.status, 1);
-  assert.match(other.stdout, /ag config edit/);
+  assert.match(other.stdout, /agt config edit/);
 });
 
 test('config validation catches bad lanes and providers', async () => {
@@ -121,7 +122,7 @@ test('sessions, changes and undo work on an empty history', async () => {
 
 test('undo restores a backed-up file and refuses when the file changed since', async () => {
   const s = await setup({ a: { url: 'http://127.0.0.1:1', keyEnv: 'A_KEY' } }, LANES);
-  const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-proj-'));
+  const proj = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'agt-proj-')));
   const file = path.join(proj, 'x.txt');
   const backup = path.join(s.home, 'backups', 'sess', '1-x.txt');
   fs.mkdirSync(path.dirname(backup), { recursive: true });

@@ -1,17 +1,21 @@
 {
-  "name": "ag-termux",
-  "version": "1.0.0",
-  "description": "Free-tier coding agent for your phone: a fallback router over free LLM APIs plus a reviewed-edit CLI. Zero dependencies, built for Termux.",
+  "name": "agt-cli",
+  "version": "1.1.0",
+  "description": "agt: a free-tier coding agent for your terminal. A local router fails over between free LLM APIs (Gemini, Groq, ...); the agent edits files with your approval, saves chats and explains problems. Zero dependencies. Windows, macOS, Linux and Android (Termux).",
   "license": "MIT",
-  "private": false,
-  "bin": { "ag": "src/ag.js" },
-  "engines": { "node": ">=18" },
+  "bin": { "agt": "bin/agt.js", "agt-cli": "bin/agt.js" },
+  "main": "src/cli.js",
+  "engines": { "node": ">=18.17" },
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "install:local": "node install.js",
+    "test": "node scripts/run-tests.js",
     "test:e2e": "python3 test/e2e_chat.py",
-    "doctor": "node src/ag.js doctor"
+    "postinstall": "node scripts/postinstall.js",
+    "prepublishOnly": "npm test"
   },
-  "files": ["src", "install.js", "scripts", "docs"],
-  "keywords": ["termux", "android", "coding-agent", "llm", "groq", "gemini", "router"]
+  "files": ["bin", "src", "scripts/postinstall.js", "docs", "examples", "README.md", "CHANGELOG.md", "LICENSE"],
+  "keywords": ["coding-agent", "cli", "llm", "gemini", "groq", "free-tier", "router", "termux", "android", "windows", "macos", "linux"],
+  "repository": { "type": "git", "url": "git+https://github.com/godlovetikum/agt-cli.git" },
+  "bugs": { "url": "https://github.com/godlovetikum/agt-cli/issues" },
+  "homepage": "https://github.com/godlovetikum/agt-cli#readme",
+  "publishConfig": { "access": "public" }
 }

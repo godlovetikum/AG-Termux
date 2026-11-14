@@ -1,11 +1,15 @@
 'use strict';
 const fs = require('fs'), path = require('path'), os = require('os');
 
-const VERSION = '1.0.0';
-const HOME = process.env.AG_HOME || path.join(os.homedir(), '.ag');
+const VERSION = require('../package.json').version;
+// Data folder: AGT_HOME (or the older AG_HOME) wins; otherwise ~/.agt, or the earlier ~/.ag when that
+// is where your existing config and history already live.
+const FRESH = path.join(os.homedir(), '.agt'), LEGACY = path.join(os.homedir(), '.ag');
+const HOME = process.env.AGT_HOME || process.env.AG_HOME || (!fs.existsSync(FRESH) && fs.existsSync(LEGACY) ? LEGACY : FRESH);
 const P = {
   home: HOME,
   config: path.join(HOME, 'config.json'),
+  keys: path.join(HOME, 'keys.env'),
   pid: path.join(HOME, 'router.pid'),
   stats: path.join(HOME, 'router-stats.json'),
   logs: path.join(HOME, 'logs'),
@@ -27,6 +31,11 @@ const DEFAULT_CONFIG = {
   maxSteps: 25,
   maxToolChars: 30000,
   previewLines: 20,
+  // Short names for pinning one exact model: /model fast  (see "agt models")
+  aliases: {
+    fast: 'groq/openai/gpt-oss-120b',
+    big: 'gemini/gemini-3-flash-preview',
+  },
   providers: {
     gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', keepGeminiFields: true },
     groq: { url: 'https://api.groq.com/openai/v1', keyEnv: 'GROQ_API_KEY' },
@@ -42,6 +51,16 @@ const TTY = !!process.stdout.isTTY && !process.env.NO_COLOR;
 const wrap = (a, b) => s => (TTY ? `\x1b[${a}m${s}\x1b[${b}m` : String(s));
 const c = { bold: wrap(1, 22), dim: wrap(2, 22), red: wrap(31, 39), green: wrap(32, 39), yellow: wrap(33, 39), blue: wrap(34, 39), cyan: wrap(36, 39) };
 const sym = { ok: c.green('✓'), warn: c.yellow('!'), fail: c.red('✗'), info: c.cyan('•') };
+
+// ---------- platform ----------
+const isTermux = () => /com\.termux/.test(process.env.PREFIX || '') || !!process.env.TERMUX_VERSION;
+const platformName = () => (isTermux() ? 'Android (Termux)' : { win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[process.platform] || process.platform);
+function installHint(pkg) {
+  if (isTermux()) return `pkg install ${pkg}`;
+  if (process.platform === 'win32') return pkg === 'git' ? 'winget install --id Git.Git' : `install ${pkg}`;
+  if (process.platform === 'darwin') return `brew install ${pkg}`;
+  return `install ${pkg} with your package manager (for example: sudo apt install ${pkg})`;
+}
 
 // ---------- formatting ----------
 const dur = s => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`);
@@ -94,7 +113,25 @@ function validateConfig(cfg) {
     });
   }
   if (!(cfg.lanes && cfg.lanes[cfg.defaultLane])) issues.push(`defaultLane "${cfg.defaultLane}" is not a lane`);
+  for (const [a, spec] of Object.entries(cfg.aliases || {})) {
+    if (cfg.lanes && cfg.lanes[a]) issues.push(`alias "${a}" has the same name as a lane (the lane wins)`);
+    if (!resolveTarget({ ...cfg, aliases: {} }, spec)) issues.push(`alias "${a}": "${spec}" is not a lane or a provider/model pair`);
+  }
   return issues;
+}
+// What a name means: a lane (ordered failover list), an alias, or one exact "provider/model".
+// A pinned model has no failover: only that model is tried.
+function resolveTarget(cfg, name) {
+  if (typeof name !== 'string' || !name) return null;
+  if (cfg.lanes && cfg.lanes[name]) return { type: 'lane', label: name, steps: cfg.lanes[name] };
+  const spec = (cfg.aliases && cfg.aliases[name]) || name;
+  if (cfg.lanes && cfg.lanes[spec]) return { type: 'lane', label: name, steps: cfg.lanes[spec] };
+  const i = spec.indexOf('/');
+  if (i > 0 && i < spec.length - 1) {
+    const p = spec.slice(0, i), m = spec.slice(i + 1);
+    if (cfg.providers && cfg.providers[p]) return { type: 'model', label: name === spec ? spec : `${name} (${spec})`, steps: [[p, m]] };
+  }
+  return null;
 }
 function keyOf(cfg, name) {
   const p = cfg.providers[name];
@@ -118,4 +155,4 @@ async function probeProvider(cfg, name, timeoutMs = 8000) {
   }
 }
 
-module.exports = { VERSION, P, DEFAULT_CONFIG, c, sym, dur, bytes, ago, formatLog, ensureDirs, appendJsonl, readJsonl, tailFile, rotate, loadConfig, validateConfig, keyOf, probeProvider };
+module.exports = { VERSION, P, DEFAULT_CONFIG, resolveTarget, isTermux, platformName, installHint, c, sym, dur, bytes, ago, formatLog, ensureDirs, appendJsonl, readJsonl, tailFile, rotate, loadConfig, validateConfig, keyOf, probeProvider };

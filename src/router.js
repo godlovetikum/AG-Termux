@@ -4,6 +4,7 @@ const G = require('./common');
 const { P } = G;
 
 G.ensureDirs();
+require('./keys').loadKeys();
 G.rotate(P.routerLog);
 let CFG;
 try { CFG = G.loadConfig(); } catch (e) { console.error(e.message); process.exit(2); }
@@ -94,16 +95,18 @@ async function handleChat(req, res) {
   const rid = Math.random().toString(36).slice(2, 8);
   let body;
   try { body = JSON.parse(await readBody(req)); } catch (e) { return send(res, 400, { error: { message: 'bad request: ' + e.message } }, { 'x-router-id': rid }); }
-  let lane = body.model;
-  if (!CFG.lanes[lane]) { log('warn', 'unknown_lane', { id: rid, asked: lane, using: CFG.defaultLane }); lane = CFG.defaultLane; }
+  // body.model is a lane name, an alias, or one pinned "provider/model" (no failover for a pin)
+  let target = G.resolveTarget(CFG, body.model);
+  if (!target) { log('warn', 'unknown_target', { id: rid, asked: body.model, using: CFG.defaultLane }); target = G.resolveTarget(CFG, CFG.defaultLane); }
+  const lane = target.label, pinned = target.type === 'model';
 
-  const usable = CFG.lanes[lane].filter(s => Array.isArray(s) && G.keyOf(CFG, s[0]));
+  const usable = target.steps.filter(s => Array.isArray(s) && G.keyOf(CFG, s[0]));
   if (!usable.length) {
-    const need = CFG.lanes[lane].map(s => s[0] && CFG.providers[s[0]] && CFG.providers[s[0]].keyEnv).filter(Boolean).join(', ');
+    const need = target.steps.map(s => s[0] && CFG.providers[s[0]] && CFG.providers[s[0]].keyEnv).filter(Boolean).join(', ');
     log('error', 'no_providers', { id: rid, lane, need });
-    return send(res, 503, { error: { message: `lane "${lane}" has no usable provider. Set one of: ${need}` } }, { 'x-router-id': rid });
+    return send(res, 503, { error: { message: `"${lane}" has no usable provider. Set: ${need}` } }, { 'x-router-id': rid });
   }
-  let steps = usable.filter(([p, m]) => !(cooling[p + '/' + m] > Date.now()));
+  let steps = pinned ? usable : usable.filter(([p, m]) => !(cooling[p + '/' + m] > Date.now()));
   if (!steps.length) steps = usable; // everything parked: try anyway
 
   const ctl = new AbortController();
@@ -174,7 +177,7 @@ const server = http.createServer(async (req, res) => {
       }
       case 'GET /stats': return send(res, 200, { uptime_s: Math.round((Date.now() - started) / 1000), since_start: session, daily });
       case 'GET /config': return send(res, 200, CFG);
-      case 'GET /models': return send(res, 200, { object: 'list', data: Object.keys(CFG.lanes).map(id => ({ id, object: 'model' })) });
+      case 'GET /models': return send(res, 200, { object: 'list', data: [...Object.keys(CFG.lanes), ...Object.keys(CFG.aliases || {})].map(id => ({ id, object: 'model' })) });
       case 'POST /chat/completions': return handleChat(req, res);
       case 'POST /admin/reset': for (const k of Object.keys(cooling)) delete cooling[k]; log('info', 'cooldowns_reset'); return send(res, 200, { ok: true });
       case 'POST /admin/reload':

@@ -1,0 +1,24 @@
+{
+  "port": 4000,
+  "defaultLane": "edit",
+  "cooldownSec": 300,
+  "requestTimeoutSec": 120,
+  "commandTimeoutSec": 120,
+  "maxSteps": 25,
+  "maxToolChars": 30000,
+  "previewLines": 20,
+  "aliases": {
+    "fast": "groq/openai/gpt-oss-120b",
+    "big": "gemini/gemini-3-flash-preview"
+  },
+  "providers": {
+    "gemini": { "url": "https://generativelanguage.googleapis.com/v1beta/openai", "keyEnv": "GEMINI_API_KEY", "keepGeminiFields": true },
+    "groq": { "url": "https://api.groq.com/openai/v1", "keyEnv": "GROQ_API_KEY" },
+    "cerebras": { "url": "https://api.cerebras.ai/v1", "keyEnv": "CEREBRAS_API_KEY" },
+    "openrouter": { "url": "https://openrouter.ai/api/v1", "keyEnv": "OPENROUTER_API_KEY" }
+  },
+  "lanes": {
+    "plan": [["gemini", "gemini-3-flash-preview"], ["groq", "openai/gpt-oss-120b"]],
+    "edit": [["groq", "openai/gpt-oss-120b"], ["gemini", "gemini-3-flash-preview"]]
+  }
+}
